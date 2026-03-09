@@ -1,0 +1,8 @@
+dataset_dir: /Users/leonardo/Library/CloudStorage/Box-Box/Research_Tech/03_Data/Images/Sources/SJB/fishprep-samples
+output_dir: /Users/leonardo/Library/CloudStorage/Box-Box/Research_Tech/05_Codes/fishprep/output
+jpeg_quality: 90
+max_size_mb: 10
+phash_threshold: 7
+blur_threshold: 5
+enable_centering_check: false
+centering_threshold: 0.2

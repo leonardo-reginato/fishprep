@@ -1,20 +1,20 @@
+from __future__ import annotations
+
+import argparse
+
+from fishprep.pipeline import run_pipeline
 
 
-def run_pipeline(dataset_dir: str, output_dir: str, config_path: str):
-    """
-    Execute the full fishprep preprocessing pipeline.
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the fishprep image preprocessing pipeline.")
+    parser.add_argument(
+        "--config",
+        default="config.yml",
+        help="Path to a YAML configuration file.",
+    )
+    return parser.parse_args()
 
-    Pipeline Steps
-    --------------
-    1. Scan dataset
-    2. Build catalog
-    3. Convert image formats
-    4. Detect duplicates
-    5. Evaluate image quality
-    6. Select best images
-    7. Rename and export dataset
 
-    Returns
-    -------
-    None
-    """
+if __name__ == "__main__":
+    args = parse_args()
+    run_pipeline(args.config)

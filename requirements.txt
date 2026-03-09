@@ -1,0 +1,7 @@
+pillow
+pandas
+imagehash
+tqdm
+pyyaml
+numpy
+pytesseract
