@@ -25,6 +25,7 @@ class DuplicateReviewApp:
         self.max_size_mb = tk.StringVar(value="10")
         self.duplicate_tolerance = tk.StringVar(value="5")
         self.blur_threshold = tk.StringVar(value="5")
+        self.use_prefix_before_second_underscore = tk.BooleanVar(value=False)
         self.enable_centering_check = tk.BooleanVar(value=False)
         self.centering_threshold = tk.StringVar(value="0.2")
 
@@ -97,18 +98,29 @@ class DuplicateReviewApp:
         ttk.Label(parent, text="Blur threshold").grid(row=3, column=2, sticky="w")
         ttk.Entry(parent, textvariable=self.blur_threshold, width=12).grid(row=3, column=3, sticky="w")
 
-        ttk.Checkbutton(parent, text="Enable centering check", variable=self.enable_centering_check).grid(
+        ttk.Checkbutton(
+            parent,
+            text="Use first two underscore groups for output names",
+            variable=self.use_prefix_before_second_underscore,
+        ).grid(
             row=4,
             column=0,
             columnspan=2,
             sticky="w",
             pady=(0, 8),
         )
-        ttk.Label(parent, text="Centering threshold").grid(row=4, column=2, sticky="w")
-        ttk.Entry(parent, textvariable=self.centering_threshold, width=12).grid(row=4, column=3, sticky="w")
+        ttk.Checkbutton(parent, text="Enable centering check", variable=self.enable_centering_check).grid(
+            row=5,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(0, 8),
+        )
+        ttk.Label(parent, text="Centering threshold").grid(row=5, column=2, sticky="w")
+        ttk.Entry(parent, textvariable=self.centering_threshold, width=12).grid(row=5, column=3, sticky="w")
 
         actions = ttk.Frame(parent)
-        actions.grid(row=5, column=0, columnspan=4, sticky="w", pady=(12, 0))
+        actions.grid(row=6, column=0, columnspan=4, sticky="w", pady=(12, 0))
         self.run_analysis_button = ttk.Button(actions, text="Run Analysis", command=self.run_analysis)
         self.run_analysis_button.pack(side="left")
         self.run_analysis_button.configure(default="active")
@@ -117,7 +129,7 @@ class DuplicateReviewApp:
         ttk.Button(actions, text="Open Review Tab", command=lambda: self.notebook.select(1)).pack(side="left", padx=(8, 0))
 
         progress_frame = ttk.LabelFrame(parent, text="Progress", padding=8)
-        progress_frame.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(16, 0))
+        progress_frame.grid(row=7, column=0, columnspan=4, sticky="ew", pady=(16, 0))
         progress_frame.columnconfigure(0, weight=1)
 
         self.progress_bar = ttk.Progressbar(progress_frame, mode="indeterminate")
@@ -133,7 +145,7 @@ class DuplicateReviewApp:
             "Set the dataset folder, output folder, and thresholds here.\n"
             "Exact duplicates are handled automatically. Duplicate tolerance controls how aggressively near-duplicate images are flagged for review in the GUI."
         )
-        ttk.Label(parent, text=help_text, justify="left").grid(row=7, column=0, columnspan=4, sticky="nw", pady=(20, 0))
+        ttk.Label(parent, text=help_text, justify="left").grid(row=8, column=0, columnspan=4, sticky="nw", pady=(20, 0))
 
     def _build_review_tab(self, parent: ttk.Frame) -> None:
         vertical = ttk.Panedwindow(parent, orient="vertical")
@@ -262,6 +274,7 @@ class DuplicateReviewApp:
             "duplicate_tolerance": int(self.duplicate_tolerance.get()),
             "phash_threshold": int(self.duplicate_tolerance.get()),
             "blur_threshold": float(self.blur_threshold.get()),
+            "use_prefix_before_second_underscore": bool(self.use_prefix_before_second_underscore.get()),
             "enable_centering_check": bool(self.enable_centering_check.get()),
             "centering_threshold": float(self.centering_threshold.get()),
         }

@@ -24,7 +24,7 @@ from fishprep.quality import (
     compute_quality_score,
     compute_resolution_score,
 )
-from fishprep.rename import extract_id_from_filename
+from fishprep.rename import derive_output_stem, extract_id_from_filename
 from fishprep.scan import build_catalog, scan_dataset
 from fishprep.utils import clean_stem, ensure_directory, file_size_mb
 
@@ -121,13 +121,20 @@ def _log_decisions(log_lines: list[str], decisions: pd.DataFrame | None) -> None
 
 
 def _scan_and_convert(dataset_dir: str, output_dir: str, config: dict) -> pd.DataFrame:
-    del output_dir, config
+    del output_dir
     image_paths = scan_dataset(dataset_dir=dataset_dir, recursive=True)
     catalog = build_catalog(image_paths)
     if catalog.empty:
         return pd.DataFrame()
 
+    use_prefix_before_second_underscore = bool(config.get("use_prefix_before_second_underscore", False))
     catalog["specimen_id"] = catalog["filename"].map(extract_id_from_filename)
+    catalog["name_group_key"] = catalog["filename"].map(
+        lambda value: derive_output_stem(
+            value,
+            use_prefix_before_second_underscore=use_prefix_before_second_underscore,
+        )
+    )
     catalog["original_path"] = catalog["path"]
     catalog = catalog.copy()
     catalog["working_path"] = catalog.apply(
@@ -235,6 +242,39 @@ def _assign_exact_groups(catalog: pd.DataFrame) -> tuple[pd.DataFrame, list[list
         working.loc[group_mask, "exact_reference_path"] = reference_path
         working.loc[group_mask & (working["path"] != reference_path), "is_exact_duplicate"] = True
     return working, exact_groups
+
+
+def _assign_name_groups(
+    catalog: pd.DataFrame,
+    use_prefix_before_second_underscore: bool,
+) -> tuple[pd.DataFrame, list[list[str]]]:
+    working = catalog.copy()
+    if not use_prefix_before_second_underscore or "name_group_key" not in working.columns:
+        return working, []
+
+    name_groups: list[list[str]] = []
+    next_group_id = int(working["exact_group_id"].dropna().max()) + 1 if working["exact_group_id"].notna().any() else 1
+
+    candidates = working.loc[~working["is_exact_duplicate"]].copy()
+    for _, group_rows in candidates.groupby("name_group_key", sort=True):
+        if len(group_rows) < 2:
+            continue
+
+        group_paths = group_rows["path"].tolist()
+        ranked = group_rows.sort_values(
+            by=["conversion_ok", "quality_score", "blur_score", "resolution_score", "working_filesize_mb"],
+            ascending=[False, False, False, False, True],
+        )
+        reference_path = ranked.iloc[0]["path"]
+        group_mask = working["path"].isin(group_paths)
+        working.loc[group_mask, "exact_group_id"] = next_group_id
+        working.loc[group_mask, "exact_reference_path"] = reference_path
+        working.loc[group_mask, "is_exact_duplicate"] = False
+        working.loc[group_mask & (working["path"] != reference_path), "is_exact_duplicate"] = True
+        name_groups.append(group_paths)
+        next_group_id += 1
+
+    return working, name_groups
 
 
 def _assign_similar_groups(catalog: pd.DataFrame, config: dict) -> tuple[pd.DataFrame, list[list[str]]]:
@@ -350,6 +390,7 @@ def _assign_output_names(catalog: pd.DataFrame, output_dir: str) -> pd.DataFrame
     working["new_filename"] = pd.NA
     working["new_path"] = pd.NA
     working["reference_base_name"] = pd.NA
+    use_prefix_before_second_underscore = bool(working.attrs.get("use_prefix_before_second_underscore", False))
 
     used_names = {key: set() for key in OUTPUT_DIRS}
     output_root = Path(output_dir)
@@ -359,7 +400,10 @@ def _assign_output_names(catalog: pd.DataFrame, output_dir: str) -> pd.DataFrame
 
     for row in standard_like.itertuples(index=False):
         category = row.final_category
-        base_name = clean_stem(Path(row.filename).stem)
+        base_name = derive_output_stem(
+            row.filename,
+            use_prefix_before_second_underscore=use_prefix_before_second_underscore,
+        )
         filename = _reserve_name(base_name, "", used_names[category])
         new_path = output_root / OUTPUT_DIRS[category] / filename
         mask = working["path"] == row.path
@@ -401,14 +445,21 @@ def _assign_output_names(catalog: pd.DataFrame, output_dir: str) -> pd.DataFrame
 
 
 def _reference_base_name(catalog: pd.DataFrame, reference_path: str) -> str:
+    use_prefix_before_second_underscore = bool(catalog.attrs.get("use_prefix_before_second_underscore", False))
     reference_row = catalog.loc[catalog["path"] == reference_path]
     if reference_row.empty:
-        return clean_stem(Path(reference_path).stem)
+        return derive_output_stem(
+            Path(reference_path).name,
+            use_prefix_before_second_underscore=use_prefix_before_second_underscore,
+        )
 
     new_filename = reference_row.iloc[0].get("new_filename")
     if isinstance(new_filename, str) and new_filename:
         return Path(new_filename).stem
-    return clean_stem(Path(reference_row.iloc[0]["filename"]).stem)
+    return derive_output_stem(
+        reference_row.iloc[0]["filename"],
+        use_prefix_before_second_underscore=use_prefix_before_second_underscore,
+    )
 
 
 def _prepare_output_dirs(output_dir: str) -> None:
@@ -481,6 +532,17 @@ def analyze_pipeline_from_config(config: dict[str, Any]) -> dict:
     catalog, exact_groups = _assign_exact_groups(catalog)
     exact_duplicate_count = int(catalog["is_exact_duplicate"].fillna(False).sum())
     _log_line(log_lines, f"Exact grouping complete. groups={len(exact_groups)} duplicates={exact_duplicate_count}")
+    catalog, name_groups = _assign_name_groups(
+        catalog,
+        use_prefix_before_second_underscore=bool(config.get("use_prefix_before_second_underscore", False)),
+    )
+    if name_groups:
+        exact_groups.extend(name_groups)
+        exact_duplicate_count = int(catalog["is_exact_duplicate"].fillna(False).sum())
+        _log_line(
+            log_lines,
+            f"Name-based grouping complete. groups={len(name_groups)} duplicates={exact_duplicate_count}",
+        )
     catalog, similar_groups = _assign_similar_groups(catalog, config)
     similar_duplicate_count = int(catalog["is_similar_duplicate"].fillna(False).sum())
     _log_line(
@@ -488,6 +550,7 @@ def analyze_pipeline_from_config(config: dict[str, Any]) -> dict:
         f"Similar grouping complete. groups_for_review={len(similar_groups)} candidates={similar_duplicate_count}",
     )
     catalog = _apply_category_flags(catalog)
+    catalog.attrs["use_prefix_before_second_underscore"] = bool(config.get("use_prefix_before_second_underscore", False))
     catalog = _assign_output_names(catalog, str(output_root))
     _log_line(log_lines, "Output names assigned.")
 
@@ -525,6 +588,7 @@ def finalize_review_from_config(config: dict[str, Any], decisions: pd.DataFrame 
     _log_line(log_lines, f"Loaded catalog rows={len(catalog)}")
     _log_decisions(log_lines, decisions)
     catalog = _apply_category_flags(catalog, decisions=decisions)
+    catalog.attrs["use_prefix_before_second_underscore"] = bool(config.get("use_prefix_before_second_underscore", False))
     catalog = _assign_output_names(catalog, output_dir)
     save_catalog(catalog, str(catalog_path))
     _log_line(log_lines, "Updated catalog written.")

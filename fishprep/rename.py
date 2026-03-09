@@ -32,6 +32,15 @@ def extract_id_from_filename(filename: str) -> str:
     return clean_stem(tokens[0])
 
 
+def derive_output_stem(filename: str, use_prefix_before_second_underscore: bool = False) -> str:
+    stem = Path(filename).stem
+    if use_prefix_before_second_underscore:
+        parts = [part for part in stem.split("_") if part]
+        if len(parts) >= 2:
+            return clean_stem("_".join(parts[:2]))
+    return clean_stem(stem)
+
+
 def rename_image(image_path: str, new_id: str, output_dir: str) -> str:
     """
     Rename an image file using a cleaned ID.

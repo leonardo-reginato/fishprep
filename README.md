@@ -35,6 +35,7 @@ jpeg_quality: 90
 max_size_mb: 10
 duplicate_tolerance: 5
 blur_threshold: 5
+use_prefix_before_second_underscore: false
 enable_centering_check: false
 centering_threshold: 0.2
 ```
@@ -78,6 +79,7 @@ The `Settings` tab includes:
 - `Max size (MB)`: maximum allowed size for each final JPEG output
 - `Duplicate tolerance`: perceptual-hash distance used to flag near-duplicate images for manual review
 - `Blur threshold`: threshold used to mark blurry images as low quality
+- `Use first two underscore groups for output names`: when enabled, filenames like `XPTO26_22_Genus_species_ID3813.png` are saved as `XPTO26_22.jpg`; unformatted names fall back to the normal naming logic
 - `Enable centering check`: toggles the off-center quality filter
 - `Centering threshold`: sensitivity for the centering check when enabled
 
@@ -117,6 +119,7 @@ Manual review decisions are stored in `duplicate_review_decisions.csv` inside th
 - `jpeg_quality`: JPEG quality used during conversion
 - `max_size_mb`: maximum size allowed for converted JPEG files
 - `duplicate_tolerance`: perceptual-hash tolerance used to flag near-duplicate images for manual review
+- `use_prefix_before_second_underscore`: when `true`, output filenames use everything before the second `_` when the source filename is formatted that way
 - `blur_threshold`: lower values make the blur filter less strict
 - `enable_centering_check`: enables or disables the off-center filter
 - `centering_threshold`: off-center sensitivity when `enable_centering_check` is enabled
@@ -130,6 +133,7 @@ jpeg_quality: 90
 max_size_mb: 10
 duplicate_tolerance: 5
 blur_threshold: 5
+use_prefix_before_second_underscore: false
 enable_centering_check: false
 centering_threshold: 0.2
 ```
@@ -151,4 +155,6 @@ centering_threshold: 0.2
 - Exact duplicates are handled automatically and are named from their reference image with `_dup`, `_dup01`, `_dup02`, and so on.
 - Similar-but-not-exact images are only moved to `duplicates/` when you exclude them during review; their names are derived from the selected group reference with `_01`, `_02`, `_03`, and so on.
 - Standard and low-quality images keep their original base filename. Only duplicate-related images receive suffixes.
+- When `use_prefix_before_second_underscore` is enabled, formatted filenames keep only the first two underscore-separated parts before duplicate suffixes are applied.
+- When `use_prefix_before_second_underscore` is enabled, repeated formatted prefixes such as `XPTO25_01` are also used to auto-group same-individual images, choose the best-quality reference, and assign duplicate suffixes without sending those images to manual review first.
 - If `rawpy` is not installed, DNG files may be scanned but will not convert successfully.
