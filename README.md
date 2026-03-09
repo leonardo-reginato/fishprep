@@ -53,6 +53,10 @@ python run.py --config config.yml
 If you want to run the automatic analysis first and then review duplicate groups in a desktop interface, use:
 
 ```bash
+cd "/path/to/folder/containing/fishprep"
+```
+
+```bash
 python gui_run.py
 ```
 
